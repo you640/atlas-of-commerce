@@ -1,23 +1,33 @@
 import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 
 const Header = () => {
-  const navItems = ["Funkcie", "Cenník", "API Dokumentácia", "O nás"];
+  const location = useLocation();
+  
+  const navItems = [
+    { label: "Funkcie", href: "/#funkcie" },
+    { label: "Cenník", href: "/cennik" },
+    { label: "API Dokumentácia", href: "/#api" },
+    { label: "O nás", href: "/#o-nas" },
+  ];
 
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center px-6 lg:px-12 py-4 border-b border-border/50 glass">
-      <Logo />
+      <Link to="/">
+        <Logo />
+      </Link>
 
       <nav className="hidden lg:block">
         <ul className="flex gap-8">
-          {navItems.map((item, index) => (
-            <li key={item}>
-              <a
-                href="#"
-                className={`nav-link ${index === 0 ? "active" : ""}`}
+          {navItems.map((item) => (
+            <li key={item.label}>
+              <Link
+                to={item.href}
+                className={`nav-link ${location.pathname === item.href ? "active" : ""}`}
               >
-                {item}
-              </a>
+                {item.label}
+              </Link>
             </li>
           ))}
         </ul>
