@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
 const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   
   const navItems = [
     { label: "Funkcie", href: "/#funkcie" },
@@ -37,7 +38,7 @@ const Header = () => {
         <Button variant="outline" size="default" className="hidden sm:flex">
           Prihlásiť sa
         </Button>
-        <Button variant="primary" size="default">
+        <Button variant="primary" size="default" onClick={() => navigate("/dashboard")}>
           Vyskúšať zadarmo
         </Button>
       </div>
