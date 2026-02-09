@@ -1,6 +1,7 @@
-import { Bell, HelpCircle, Menu, Search } from "lucide-react";
+import { Bell, HelpCircle, Menu, Search, Stethoscope } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 
 interface DashboardHeaderProps {
@@ -15,6 +16,11 @@ const DashboardHeader = ({ onMenuClick }: DashboardHeaderProps) => {
         <Logo />
         
         <div className="flex items-center gap-2">
+          <Link to="/diagnostic">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" title="Diagnostika">
+              <Stethoscope className="h-5 w-5" />
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
             <Bell className="h-5 w-5" />
           </Button>
