@@ -16,7 +16,33 @@ const SparklineChart = ({ values, color }: { values: number[]; color: "blue" | "
   );
 };
 
-const DataCardPreview = () => {
+/** Extract a human-readable company name from the API response */
+function extractField(data: Record<string, unknown> | null | undefined, ...keys: string[]): string | undefined {
+  if (!data) return undefined;
+  for (const k of keys) {
+    if (typeof data[k] === "string" && (data[k] as string).length > 0) return data[k] as string;
+  }
+  // Try nested "data" envelope
+  const inner = data.data;
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const d = inner as Record<string, unknown>;
+    for (const k of keys) {
+      if (typeof d[k] === "string" && (d[k] as string).length > 0) return d[k] as string;
+    }
+  }
+  return undefined;
+}
+
+interface DataCardPreviewProps {
+  data?: Record<string, unknown> | null;
+}
+
+const DataCardPreview = ({ data }: DataCardPreviewProps) => {
+  // Derive display values from API data, fallback to hardcoded demo
+  const companyName = extractField(data, "name", "company_name", "obchodne_meno") ?? "ESET, spol. s r.o.";
+  const ico = extractField(data, "ico", "cin") ?? "31333532";
+  const address = extractField(data, "address", "sidlo", "registered_office");
+
   const executives = ["Ing. Miroslav Trnka", "Rudolf Hrubý", "Maroš Grund"];
 
   return (
@@ -24,8 +50,8 @@ const DataCardPreview = () => {
       {/* Card Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8 pb-4 border-b border-border/50">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-1">ESET, spol. s r.o.</h2>
-          <span className="text-primary font-semibold tracking-wider">IČO: 31333532</span>
+          <h2 className="text-2xl font-bold text-foreground mb-1">{companyName}</h2>
+          <span className="text-primary font-semibold tracking-wider">IČO: {ico}</span>
         </div>
         <div className="flex items-center gap-2 bg-accent/10 px-3 py-1.5 rounded-full border border-accent/30">
           <div className="w-2.5 h-2.5 bg-accent rounded-full shadow-[0_0_10px_hsl(var(--accent))] animate-blink" />
@@ -42,7 +68,7 @@ const DataCardPreview = () => {
             Sídlo
           </h4>
           <p className="text-silver font-medium leading-relaxed">
-            Einsteinova 24<br />851 01 Bratislava
+            {address ?? (<>Einsteinova 24<br />851 01 Bratislava</>)}
           </p>
         </div>
 
