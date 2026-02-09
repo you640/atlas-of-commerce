@@ -3,18 +3,36 @@ import { type ReactNode } from "react";
 
 /* ── Helpers ── */
 
-/** Format a number as EUR with Slovak-style magnitude suffix */
+/** Clamp invalid numeric values to undefined */
+export function normalizeFinanceValue(v: unknown): number | undefined {
+  if (v == null) return undefined;
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return n;
+}
+
+/** Format a number as EUR with Slovak-style magnitude suffix.
+ *  Negative values use "−" (minus sign U+2212) with absolute formatting.
+ *  Uses non-breaking space as thousands separator for plain values. */
 export function formatMoneyEUR(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+
+  const negative = value < 0;
+  const prefix = negative ? "−\u00A0" : "";
   const abs = Math.abs(value);
+
   if (abs >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return `${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)} mil. €`;
+    const millions = abs / 1_000_000;
+    return `${prefix}${millions.toFixed(1).replace(/\.0$/, "")} mil. €`;
   }
   if (abs >= 1_000) {
-    const thousands = value / 1_000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)} tis. €`;
+    const thousands = abs / 1_000;
+    return `${prefix}${thousands.toFixed(1).replace(/\.0$/, "")} tis. €`;
   }
-  return `${value} €`;
+
+  // For values < 1000, format with locale spacing (e.g. "1 234 €")
+  const formatted = Math.round(abs).toLocaleString("sk-SK");
+  return `${prefix}${formatted} €`;
 }
 
 /**
@@ -85,12 +103,8 @@ function extractNumber(data: Record<string, unknown> | null | undefined, ...keys
   }
   for (const src of sources) {
     for (const k of keys) {
-      const v = src[k];
-      if (typeof v === "number") return v;
-      if (typeof v === "string" && v.length > 0) {
-        const n = Number(v);
-        if (!isNaN(n)) return n;
-      }
+      const result = normalizeFinanceValue(src[k]);
+      if (result !== undefined) return result;
     }
   }
   return undefined;
