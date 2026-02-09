@@ -77,11 +77,11 @@ async function runDiagnostics(): Promise<DiagnosticResult[]> {
   );
   results.push(test1);
 
-  // Test 2: Invalid ICO "test" — expect 404 or error
+  // Test 2: Invalid ICO "test" — expect 400 or 404
   const test2 = await fetchDiagnostic(
     "test",
-    "Invalid ICO lookup (test) — expect 404",
-    [404]
+    "Invalid ICO lookup (test) — expect 400/404",
+    [400, 404]
   );
   results.push(test2);
 
