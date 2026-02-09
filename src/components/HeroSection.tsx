@@ -59,11 +59,11 @@ const HeroSection = () => {
         </div>
       )}
 
-      {/* Success → show the existing data card */}
-      {result?.type === "success" && <DataCardPreview data={result.data} />}
+      {/* Success → show the data card with API data */}
+      {result?.type === "success" && result.data && <DataCardPreview data={result.data} />}
 
-      {/* Show static preview when no search has been performed yet */}
-      {!result && !loading && <DataCardPreview />}
+      {/* Show demo preview only when no search has been performed yet */}
+      {!result && !loading && <DataCardPreview mode="demo" />}
     </main>
   );
 };

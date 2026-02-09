@@ -33,17 +33,31 @@ function extractField(data: Record<string, unknown> | null | undefined, ...keys:
   return undefined;
 }
 
-interface DataCardPreviewProps {
-  data?: Record<string, unknown> | null;
-}
+type DataCardPreviewProps =
+  | { mode: "demo" }
+  | { mode?: "api"; data: Record<string, unknown> };
 
-const DataCardPreview = ({ data }: DataCardPreviewProps) => {
-  // Derive display values from API data, fallback to hardcoded demo
-  const companyName = extractField(data, "name", "company_name", "obchodne_meno") ?? "ESET, spol. s r.o.";
-  const ico = extractField(data, "ico", "cin") ?? "31333532";
-  const address = extractField(data, "address", "sidlo", "registered_office");
+const DEMO_DATA = {
+  companyName: "ESET, spol. s r.o.",
+  ico: "31333532",
+  address: <>Einsteinova 24<br />851 01 Bratislava</>,
+  executives: ["Ing. Miroslav Trnka", "Rudolf Hrubý", "Maroš Grund"],
+};
 
-  const executives = ["Ing. Miroslav Trnka", "Rudolf Hrubý", "Maroš Grund"];
+const DataCardPreview = (props: DataCardPreviewProps) => {
+  const isDemo = props.mode === "demo";
+  const data = isDemo ? null : (props as { data: Record<string, unknown> }).data;
+
+  const companyName = isDemo
+    ? DEMO_DATA.companyName
+    : extractField(data, "name", "company_name", "obchodne_meno") ?? "—";
+  const ico = isDemo
+    ? DEMO_DATA.ico
+    : extractField(data, "ico", "cin") ?? "—";
+  const address = isDemo
+    ? DEMO_DATA.address
+    : extractField(data, "address", "sidlo", "registered_office") ?? "—";
+  const executives = DEMO_DATA.executives;
 
   return (
     <div className="mt-12 w-full max-w-3xl bg-background/80 backdrop-blur-xl border border-border/50 border-t-2 border-t-primary/50 rounded-xl p-8 relative overflow-hidden shadow-2xl animate-slide-up animate-scanline">
@@ -68,7 +82,7 @@ const DataCardPreview = ({ data }: DataCardPreviewProps) => {
             Sídlo
           </h4>
           <p className="text-silver font-medium leading-relaxed">
-            {address ?? (<>Einsteinova 24<br />851 01 Bratislava</>)}
+            {address}
           </p>
         </div>
 
