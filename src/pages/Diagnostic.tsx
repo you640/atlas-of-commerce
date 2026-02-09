@@ -1,106 +1,66 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle, AlertTriangle, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
 
-// Uses Vite dev proxy: /api/proxy-search → https://icoatlas.sk/api/company/proxy-search
-
-interface DiagnosticResult {
+interface DiagnosticEntry {
+  ico: string;
   label: string;
-  requestUrl: string;
-  status: number | null;
-  statusText: string;
-  responseHeaders: Record<string, string>;
-  bodyPreview: string;
-  error?: string;
-  pass: boolean;
+  expectedType: CompanySearchResult["type"][];
+  result?: CompanySearchResult;
 }
 
-async function fetchDiagnostic(
-  ico: string,
-  label: string,
-  expectStatus?: number[]
-): Promise<DiagnosticResult> {
-  const requestUrl = `/api/proxy-search?ico=${encodeURIComponent(ico)}`;
+const TESTS: Omit<DiagnosticEntry, "result">[] = [
+  {
+    ico: "31333532",
+    label: "Platné IČO (31333532) → očakávame success",
+    expectedType: ["success"],
+  },
+  {
+    ico: "test",
+    label: "Neplatné IČO (test) → očakávame validation_error",
+    expectedType: ["validation_error"],
+  },
+  {
+    ico: "00000000",
+    label: "Neexistujúce IČO (00000000) → očakávame not_found",
+    expectedType: ["not_found"],
+  },
+];
 
-  try {
-    const res = await fetch(requestUrl, {
-      method: "GET",
-      headers: {
-        "X-ICO-LOOKUP-CONTRACT": "js_default",
-      },
-    });
+const typeIcon = (type: CompanySearchResult["type"], pass: boolean) => {
+  if (pass) return <CheckCircle2 className="h-5 w-5 text-accent shrink-0" />;
+  return <XCircle className="h-5 w-5 text-destructive shrink-0" />;
+};
 
-    const headersObj: Record<string, string> = {};
-    res.headers.forEach((value, key) => {
-      headersObj[key] = value;
-    });
-
-    const text = await res.text();
-    const bodyPreview = text.slice(0, 500);
-
-    const pass = expectStatus ? expectStatus.includes(res.status) : res.ok;
-
-    return {
-      label,
-      requestUrl,
-      status: res.status,
-      statusText: res.statusText,
-      responseHeaders: headersObj,
-      bodyPreview,
-      pass,
-    };
-  } catch (err: any) {
-    return {
-      label,
-      requestUrl,
-      status: null,
-      statusText: "Network Error",
-      responseHeaders: {},
-      bodyPreview: "",
-      error: err.message || String(err),
-      pass: false,
-    };
-  }
-}
-
-async function runDiagnostics(): Promise<DiagnosticResult[]> {
-  const results: DiagnosticResult[] = [];
-
-  // Test 1: Valid ICO
-  const test1 = await fetchDiagnostic(
-    "31333532",
-    "Valid ICO lookup (31333532)",
-    [200]
-  );
-  results.push(test1);
-
-  // Test 2: Invalid ICO "test" — expect 400 or 404
-  const test2 = await fetchDiagnostic(
-    "test",
-    "Invalid ICO lookup (test) — expect 400/404",
-    [400, 404]
-  );
-  results.push(test2);
-
-  return results;
-}
+const typeBadge = (type: CompanySearchResult["type"]) => {
+  const map: Record<CompanySearchResult["type"], { label: string; cls: string }> = {
+    success: { label: "SUCCESS", cls: "text-accent" },
+    validation_error: { label: "VALIDATION ERROR", cls: "text-yellow-400" },
+    not_found: { label: "NOT FOUND", cls: "text-muted-foreground" },
+    network_error: { label: "NETWORK ERROR", cls: "text-destructive" },
+  };
+  const { label, cls } = map[type];
+  return <span className={`font-bold text-xs uppercase ${cls}`}>{label}</span>;
+};
 
 const Diagnostic = () => {
-  const [results, setResults] = useState<DiagnosticResult[]>([]);
+  const [entries, setEntries] = useState<DiagnosticEntry[]>([]);
   const [running, setRunning] = useState(false);
 
   const handleRun = async () => {
     setRunning(true);
-    setResults([]);
-    try {
-      const res = await runDiagnostics();
-      setResults(res);
-    } finally {
-      setRunning(false);
+    setEntries([]);
+    const results: DiagnosticEntry[] = [];
+    for (const test of TESTS) {
+      const result = await searchCompany(test.ico);
+      results.push({ ...test, result });
     }
+    setEntries(results);
+    setRunning(false);
   };
 
   return (
@@ -140,88 +100,87 @@ const Diagnostic = () => {
             </Button>
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
-            <p>Test 1: GET proxy-search?ico=31333532 → expect 200</p>
-            <p>Test 2: GET proxy-search?ico=test → expect 404 + error message</p>
+            {TESTS.map((t, i) => (
+              <p key={i}>Test {i + 1}: {t.label}</p>
+            ))}
           </CardContent>
         </Card>
 
-        {results.map((r, i) => (
-          <Card key={i} className="glass border-border overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                {r.pass ? (
-                  <CheckCircle2 className="h-5 w-5 text-accent shrink-0" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-destructive shrink-0" />
-                )}
-                <CardTitle className="text-sm font-semibold">
-                  {r.label}
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs">
-              {/* Request URL */}
-              <div>
-                <span className="text-muted-foreground block mb-1 font-medium">
-                  Request URL
-                </span>
-                <code className="block bg-muted/30 rounded-lg p-2 break-all text-foreground">
-                  {r.requestUrl}
-                </code>
-              </div>
+        {entries.map((entry, i) => {
+          const r = entry.result;
+          if (!r) return null;
+          const pass = entry.expectedType.includes(r.type);
 
-              {/* Status */}
-              <div>
-                <span className="text-muted-foreground block mb-1 font-medium">
-                  Status
-                </span>
-                <span
-                  className={
-                    r.pass ? "text-accent font-bold" : "text-destructive font-bold"
-                  }
-                >
-                  {r.status ?? "N/A"} {r.statusText}
-                </span>
-              </div>
+          return (
+            <Card key={i} className="glass border-border overflow-hidden">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  {typeIcon(r.type, pass)}
+                  <CardTitle className="text-sm font-semibold">
+                    {entry.label}
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                {/* Classification */}
+                <div className="flex items-center gap-3">
+                  <span className="text-muted-foreground font-medium">Typ:</span>
+                  {typeBadge(r.type)}
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-foreground font-medium">{r.message}</span>
+                </div>
 
-              {/* Error */}
-              {r.error && (
+                {/* Request URL */}
                 <div>
-                  <span className="text-destructive block mb-1 font-medium">
-                    Error
+                  <span className="text-muted-foreground block mb-1 font-medium">
+                    Request URL
                   </span>
-                  <code className="block bg-destructive/10 rounded-lg p-2 text-destructive break-all">
-                    {r.error}
+                  <code className="block bg-muted/30 rounded-lg p-2 break-all text-foreground">
+                    {r.requestUrl}
                   </code>
                 </div>
-              )}
 
-              {/* Response Headers */}
-              <div>
-                <span className="text-muted-foreground block mb-1 font-medium">
-                  Response Headers
-                </span>
-                <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
-                  {Object.keys(r.responseHeaders).length > 0
-                    ? Object.entries(r.responseHeaders)
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join("\n")
-                    : "—"}
-                </pre>
-              </div>
+                {/* Status */}
+                <div>
+                  <span className="text-muted-foreground block mb-1 font-medium">
+                    Status
+                  </span>
+                  <span
+                    className={
+                      pass ? "text-accent font-bold" : "text-destructive font-bold"
+                    }
+                  >
+                    {r.status ?? "N/A"}
+                  </span>
+                </div>
 
-              {/* Body Preview */}
-              <div>
-                <span className="text-muted-foreground block mb-1 font-medium">
-                  Body (first 500 chars)
-                </span>
-                <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
-                  {r.bodyPreview || "—"}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                {/* Response Headers */}
+                <div>
+                  <span className="text-muted-foreground block mb-1 font-medium">
+                    Response Headers
+                  </span>
+                  <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
+                    {Object.keys(r.responseHeaders).length > 0
+                      ? Object.entries(r.responseHeaders)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join("\n")
+                      : "—"}
+                  </pre>
+                </div>
+
+                {/* Body Preview */}
+                <div>
+                  <span className="text-muted-foreground block mb-1 font-medium">
+                    Body (prvých 500 znakov)
+                  </span>
+                  <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
+                    {r.bodyPreview || "—"}
+                  </pre>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </>
   );
