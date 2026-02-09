@@ -2,7 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
-const Header = () => {
+interface HeaderProps {
+  onLogoLongPress?: () => void;
+}
+
+const Header = ({ onLogoLongPress }: HeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -16,7 +20,7 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 flex justify-between items-center px-6 lg:px-12 py-4 border-b border-border/50 glass">
       <Link to="/">
-        <Logo />
+        <Logo onLongPress={onLogoLongPress} />
       </Link>
 
       <nav className="hidden lg:block">

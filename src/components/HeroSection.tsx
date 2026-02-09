@@ -1,23 +1,70 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AlertTriangle, SearchX } from "lucide-react";
 import SearchBox from "./SearchBox";
 import DataCardPreview from "./DataCardPreview";
 import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
+import { setLastRequest, loadFixture, getUseFixture, type DebugRequestRecord } from "@/lib/debug-store";
 
-const HeroSection = () => {
+interface HeroSectionProps {
+  onDebugCommand?: () => void;
+}
+
+const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompanySearchResult | null>(null);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const trimmed = query.trim();
     if (!trimmed || loading) return;
+
+    // Debug command: typing "debug" toggles debug mode
+    if (trimmed.toLowerCase() === "debug") {
+      setQuery("");
+      onDebugCommand?.();
+      return;
+    }
+
+    // Check fixture mode
+    if (getUseFixture()) {
+      const fixture = loadFixture();
+      if (fixture) {
+        setResult(fixture.normalizedResult);
+        setLastRequest({ ...fixture, query: trimmed, timestamp: new Date().toISOString() });
+        return;
+      }
+    }
+
     setLoading(true);
     setResult(null);
+
+    const startTime = performance.now();
     const res = await searchCompany(trimmed);
+    const latencyMs = Math.round(performance.now() - startTime);
+
     setResult(res);
     setLoading(false);
-  };
+
+    // Capture debug record
+    const debugRecord: DebugRequestRecord = {
+      query: trimmed,
+      requestUrl: res.requestUrl,
+      requestHeaders: { "X-ICO-LOOKUP-CONTRACT": "js_default" },
+      httpStatus: res.status,
+      latencyMs,
+      timestamp: new Date().toISOString(),
+      rawJson: res.bodyPreview || JSON.stringify(res.data, null, 2) || "",
+      normalizedResult: res,
+    };
+    setLastRequest(debugRecord);
+  }, [query, loading, onDebugCommand]);
+
+  // Replay: re-run the last query
+  const replay = useCallback(() => {
+    if (query.trim()) {
+      handleSubmit();
+    }
+  }, [query, handleSubmit]);
 
   return (
     <main className="relative z-10 flex flex-col items-center justify-center text-center px-4 py-16 lg:py-24">
@@ -68,4 +115,5 @@ const HeroSection = () => {
   );
 };
 
+// Expose replay via ref pattern — we use a simpler callback approach from parent
 export default HeroSection;

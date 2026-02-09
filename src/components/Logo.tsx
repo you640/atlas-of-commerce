@@ -1,8 +1,37 @@
 import { Cog, Globe } from "lucide-react";
+import { useRef, useCallback } from "react";
 
-const Logo = () => {
+interface LogoProps {
+  onLongPress?: () => void;
+}
+
+const LONG_PRESS_MS = 2000;
+
+const Logo = ({ onLongPress }: LogoProps) => {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePointerDown = useCallback(() => {
+    if (!onLongPress) return;
+    timerRef.current = setTimeout(() => {
+      onLongPress();
+      timerRef.current = null;
+    }, LONG_PRESS_MS);
+  }, [onLongPress]);
+
+  const handlePointerUp = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
   return (
-    <div className="flex items-center gap-3 animate-logo-pulse">
+    <div
+      className="flex items-center gap-3 animate-logo-pulse select-none"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
       <div className="relative w-12 h-12">
         {/* Globe with gradient effect */}
         <div className="absolute inset-0 rounded-full bg-gradient-primary opacity-80" />
