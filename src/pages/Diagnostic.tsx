@@ -5,8 +5,7 @@ import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Uses Vite dev proxy: /api/proxy-search → https://icoatlas.sk/api/company/proxy-search
 
 interface DiagnosticResult {
   label: string;
@@ -24,15 +23,13 @@ async function fetchDiagnostic(
   label: string,
   expectStatus?: number[]
 ): Promise<DiagnosticResult> {
-  const requestUrl = `${SUPABASE_URL}/functions/v1/proxy-search?ico=${encodeURIComponent(ico)}`;
+  const requestUrl = `/api/proxy-search?ico=${encodeURIComponent(ico)}`;
 
   try {
     const res = await fetch(requestUrl, {
       method: "GET",
       headers: {
         "X-ICO-LOOKUP-CONTRACT": "js_default",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        apikey: SUPABASE_ANON_KEY,
       },
     });
 
