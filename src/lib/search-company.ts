@@ -18,12 +18,31 @@ export interface CompanySearchResult {
   requestUrl: string;
 }
 
+/** Check whether parsed data contains a meaningful company record */
+function hasCompanyData(parsed: Record<string, unknown> | null): boolean {
+  if (!parsed) return false;
+  // Top-level name fields
+  if (parsed.name || parsed.company_name || parsed.obchodne_meno) return true;
+  // Nested inside a "data" envelope
+  const inner = parsed.data;
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const d = inner as Record<string, unknown>;
+    if (d.name || d.company_name || d.obchodne_meno) return true;
+  }
+  return false;
+}
+
+const TIMEOUT_MS = 12_000;
+
 export async function searchCompany(ico: string): Promise<CompanySearchResult> {
   const requestUrl = `/api/proxy-search?ico=${encodeURIComponent(ico)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
     const res = await fetch(requestUrl, {
       method: "GET",
+      signal: controller.signal,
       headers: {
         "X-ICO-LOOKUP-CONTRACT": "js_default",
       },
@@ -57,8 +76,8 @@ export async function searchCompany(ico: string): Promise<CompanySearchResult> {
       };
     }
 
-    // 2) HTTP 200 + found:true → success
-    if (res.status === 200 && parsed?.found === true) {
+    // 2) HTTP 200 + found:true + meaningful company data → success
+    if (res.status === 200 && parsed?.found === true && hasCompanyData(parsed)) {
       return {
         type: "success",
         message: "Záznam nájdený.",
@@ -70,11 +89,12 @@ export async function searchCompany(ico: string): Promise<CompanySearchResult> {
       };
     }
 
-    // 3) HTTP 200 + found:false, or 404, or any empty/missing result → not found
+    // 3) HTTP 200 with empty/missing data, found:false, 404, or no company name → not found
     if (
       res.status === 404 ||
       (res.status === 200 && parsed?.found === false) ||
-      (res.status === 200 && !parsed?.data)
+      (res.status === 200 && !parsed?.data) ||
+      (res.status === 200 && !hasCompanyData(parsed))
     ) {
       return {
         type: "not_found",
@@ -111,7 +131,12 @@ export async function searchCompany(ico: string): Promise<CompanySearchResult> {
       requestUrl,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const isTimeout = err instanceof DOMException && err.name === "AbortError";
+    const errorMsg = isTimeout
+      ? "Časový limit požiadavky vypršal (12 s)."
+      : err instanceof Error
+        ? err.message
+        : String(err);
     return {
       type: "network_error",
       message: "Chyba siete: " + errorMsg,
@@ -121,5 +146,7 @@ export async function searchCompany(ico: string): Promise<CompanySearchResult> {
       responseHeaders: {},
       requestUrl,
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
