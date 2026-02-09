@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      "/api/proxy-search": {
+        target: "https://icoatlas.sk",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/proxy-search/, "/api/company/proxy-search"),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
