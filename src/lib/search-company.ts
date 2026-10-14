@@ -133,13 +133,12 @@ export async function searchCompany(ico: string): Promise<CompanySearchResult> {
   } catch (err: unknown) {
     const isTimeout = err instanceof DOMException && err.name === "AbortError";
     const errorMsg = isTimeout
-      ? "Časový limit požiadavky vypršal (12 s)."
-      : err instanceof Error
-        ? err.message
-        : String(err);
+      ? "Služba je momentálne nedostupná (server neodpovedá). Skúste to prosím neskôr."
+      : "Chyba siete: " +
+        (err instanceof Error ? err.message : String(err));
     return {
       type: "network_error",
-      message: "Chyba siete: " + errorMsg,
+      message: errorMsg,
       status: null,
       data: null,
       bodyPreview: "",
