@@ -10,8 +10,10 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       "/api/proxy-search": {
-        target: "https://icoatlas.sk",
+        target: "http://2.29.52.59:3010",
         changeOrigin: true,
+        timeout: 12_000,
+        proxyTimeout: 12_000,
         rewrite: (path) => path.replace(/^\/api\/proxy-search/, "/api/company/proxy-search"),
       },
     },
