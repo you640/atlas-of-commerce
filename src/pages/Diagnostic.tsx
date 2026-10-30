@@ -5,7 +5,7 @@ import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle, AlertTriangle, SearchX
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { copyResponse } from "@/lib/response-actions";
-import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
+import { searchCompany, SEARCH_HEADERS, type CompanySearchResult } from "@/lib/search-company";
 
 interface DiagnosticEntry {
   ico: string;
@@ -57,7 +57,7 @@ const Diagnostic = () => {
   const [entries, setEntries] = useState<DiagnosticEntry[]>([]);
   const [running, setRunning] = useState(false);
 
-  const handleRun = async () => {
+  const runDiagnostics = async () => {
     setRunning(true);
     setEntries([]);
     const results: DiagnosticEntry[] = [];
@@ -95,7 +95,7 @@ const Diagnostic = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={handleRun}
+              onClick={runDiagnostics}
               disabled={running}
             >
               {running ? (
@@ -169,6 +169,10 @@ const Diagnostic = () => {
                 </div>
 
                 {/* Response Headers */}
+                 <div>
+                   <span className="text-muted-foreground block mb-1 font-medium">Request Headers</span>
+                   <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">{Object.entries(SEARCH_HEADERS).map(([key, value]) => `${key}: ${value}`).join("\n")}</pre>
+                 </div>
                 <div>
                   <span className="text-muted-foreground block mb-1 font-medium">
                     Response Headers
