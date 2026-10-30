@@ -1,151 +1,74 @@
-// Shared search logic for IČO Atlas proxy-search API
-// Always sends X-ICO-LOOKUP-CONTRACT: js_default
+// Shared transport for search and diagnostics. Never replace API data with demos.
+export const SEARCH_TIMEOUT_MS = 12_000;
+export const SEARCH_HEADERS = { "X-ICO-LOOKUP-CONTRACT": "js_default" };
 
 export interface CompanySearchResult {
-  /** "success" | "validation_error" | "not_found" | "network_error" */
   type: "success" | "validation_error" | "not_found" | "network_error";
-  /** Slovak user-facing message */
   message: string;
-  /** Raw HTTP status or null on network error */
   status: number | null;
-  /** Parsed JSON body (if any) */
   data: Record<string, unknown> | null;
-  /** Raw body text (first 500 chars) */
   bodyPreview: string;
-  /** Response headers */
+  rawBody?: string;
+  latencyMs?: number;
+  timestamp?: string;
   responseHeaders: Record<string, string>;
-  /** Full request URL */
   requestUrl: string;
 }
 
-/** Check whether parsed data contains a meaningful company record */
-function hasCompanyData(parsed: Record<string, unknown> | null): boolean {
-  if (!parsed) return false;
-  // Top-level name fields
-  if (parsed.name || parsed.company_name || parsed.obchodne_meno) return true;
-  // Nested inside a "data" envelope
-  const inner = parsed.data;
-  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
-    const d = inner as Record<string, unknown>;
-    if (d.name || d.company_name || d.obchodne_meno) return true;
-  }
-  return false;
+export function isCompanyRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-const TIMEOUT_MS = 12_000;
+export function hasCompanyData(parsed: Record<string, unknown> | null): boolean {
+  if (!parsed) return false;
+  const sources = [parsed, ...(isCompanyRecord(parsed.data) ? [parsed.data] : [])];
+  return sources.some(source => [source.name, source.company_name, source.obchodne_meno]
+    .some(name => typeof name === "string" && name.trim().length > 0));
+}
+
+export function classifyResponse(status: number, text: string, parsed: Record<string, unknown> | null): Pick<CompanySearchResult, "type" | "message"> {
+  if (status === 400 && text.includes("Invalid ICO format")) {
+    return { type: "validation_error", message: "Neplatný formát IČO." };
+  }
+  if (status === 404 || (status === 200 && (parsed?.found === false || !hasCompanyData(parsed)))) {
+    return { type: "not_found", message: "Nenašli sme záznam." };
+  }
+  if (status === 200 && hasCompanyData(parsed)) {
+    return { type: "success", message: "Záznam nájdený." };
+  }
+  return { type: "network_error", message: "Služba je momentálne nedostupná. Skúste to prosím neskôr." };
+}
 
 export async function searchCompany(ico: string): Promise<CompanySearchResult> {
-  const requestUrl = `/api/proxy-search?ico=${encodeURIComponent(ico)}`;
+  const base = (import.meta.env?.VITE_COMPANY_API_BASE_URL || "").replace(/\/$/, "");
+  const path = base ? `${base}/api/company/proxy-search` : "/api/proxy-search";
+  const requestUrl = new URL(`${path}?ico=${encodeURIComponent(ico.trim())}`, window.location.origin).href;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
+  const started = performance.now();
+  const timestamp = new Date().toISOString();
+  const timer = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+  let status: number | null = null;
+  const responseHeaders: Record<string, string> = {};
   try {
-    const res = await fetch(requestUrl, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        "X-ICO-LOOKUP-CONTRACT": "js_default",
-      },
-    });
-
-    const headersObj: Record<string, string> = {};
-    res.headers.forEach((value, key) => {
-      headersObj[key] = value;
-    });
-
+    const res = await fetch(requestUrl, { method: "GET", signal: controller.signal, headers: SEARCH_HEADERS });
+    status = res.status;
+    res.headers.forEach((value, key) => { responseHeaders[key] = value; });
     const text = await res.text();
-    const bodyPreview = text.slice(0, 500);
-
     let parsed: Record<string, unknown> | null = null;
     try {
-      parsed = JSON.parse(text);
-    } catch {
-      // not JSON
-    }
-
-    // 1) HTTP 400 + body contains "Invalid ICO format" → validation error
-    if (res.status === 400 && text.includes("Invalid ICO format")) {
-      return {
-        type: "validation_error",
-        message: "Neplatný formát IČO.",
-        status: res.status,
-        data: parsed,
-        bodyPreview,
-        responseHeaders: headersObj,
-        requestUrl,
-      };
-    }
-
-    // 2) HTTP 200 + found:true + meaningful company data → success
-    if (res.status === 200 && parsed?.found === true && hasCompanyData(parsed)) {
-      return {
-        type: "success",
-        message: "Záznam nájdený.",
-        status: res.status,
-        data: parsed,
-        bodyPreview,
-        responseHeaders: headersObj,
-        requestUrl,
-      };
-    }
-
-    // 3) HTTP 200 with empty/missing data, found:false, 404, or no company name → not found
-    if (
-      res.status === 404 ||
-      (res.status === 200 && parsed?.found === false) ||
-      (res.status === 200 && !parsed?.data) ||
-      (res.status === 200 && !hasCompanyData(parsed))
-    ) {
-      return {
-        type: "not_found",
-        message: "Nenašli sme záznam.",
-        status: res.status,
-        data: parsed,
-        bodyPreview,
-        responseHeaders: headersObj,
-        requestUrl,
-      };
-    }
-
-    // 4) Any other non-ok status → treat as not found / error
-    if (!res.ok) {
-      return {
-        type: "not_found",
-        message: "Nenašli sme záznam.",
-        status: res.status,
-        data: parsed,
-        bodyPreview,
-        responseHeaders: headersObj,
-        requestUrl,
-      };
-    }
-
-    // 5) Fallback for 200 with data
-    return {
-      type: "success",
-      message: "Záznam nájdený.",
-      status: res.status,
-      data: parsed,
-      bodyPreview,
-      responseHeaders: headersObj,
-      requestUrl,
-    };
-  } catch (err: unknown) {
-    const isTimeout = err instanceof DOMException && err.name === "AbortError";
-    const errorMsg = isTimeout
+      const value: unknown = JSON.parse(text);
+      if (isCompanyRecord(value)) parsed = value;
+    } catch { /* HTML and malformed JSON are not company records. */ }
+    const classification = status === 200 && !parsed && text.trim()
+      ? { type: "network_error" as const, message: "Služba vrátila neplatnú odpoveď. Skúste to prosím neskôr." }
+      : classifyResponse(status, text, parsed);
+    return { ...classification, status, data: parsed, bodyPreview: text.slice(0, 500), rawBody: text,
+      responseHeaders, requestUrl, latencyMs: Math.round(performance.now() - started), timestamp };
+  } catch {
+    return { type: "network_error", message: controller.signal.aborted
       ? "Služba je momentálne nedostupná (server neodpovedá). Skúste to prosím neskôr."
-      : "Chyba siete: " +
-        (err instanceof Error ? err.message : String(err));
-    return {
-      type: "network_error",
-      message: errorMsg,
-      status: null,
-      data: null,
-      bodyPreview: "",
-      responseHeaders: {},
-      requestUrl,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
+      : "Nepodarilo sa spojiť so službou. Skontrolujte pripojenie a skúste to znova.",
+      status, data: null, bodyPreview: "", rawBody: "", responseHeaders, requestUrl,
+      latencyMs: Math.round(performance.now() - started), timestamp };
+  } finally { clearTimeout(timer); }
 }

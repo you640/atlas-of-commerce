@@ -20,8 +20,9 @@ const SearchBox = ({ value, onChange, onSubmit, loading }: SearchBoxProps) => {
       <Search className="w-6 h-6 text-primary ml-4 opacity-70" />
       <input
         type="text"
-        placeholder="Zadajte IČO, názov firmy alebo priezvisko..."
-        className="flex-1 bg-transparent border-none px-4 py-4 text-lg text-foreground font-montserrat outline-none placeholder:text-muted-foreground/60 placeholder:font-light"
+        placeholder="Zadajte IČO firmy..."
+        aria-label="IČO firmy"
+        className="min-w-0 w-0 flex-1 bg-transparent border-none px-4 py-4 text-lg text-foreground font-montserrat outline-none placeholder:text-muted-foreground/60 placeholder:font-light"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -29,7 +30,8 @@ const SearchBox = ({ value, onChange, onSubmit, loading }: SearchBoxProps) => {
       <Button
         variant="search"
         size="xl"
-        className="gap-3"
+        className="gap-3 shrink-0"
+        aria-label="Vyhľadať"
         onClick={onSubmit}
         disabled={loading}
       >
