@@ -1,12 +1,13 @@
 import { MapPin, TrendingUp, Users, Building2, Copy, Download } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { copyResponse, downloadResponse } from "@/lib/response-actions";
+import { Button } from "@/components/ui/button";
 
 /* ── Helpers ── */
 
 /** Clamp invalid numeric values to undefined */
 export function normalizeFinanceValue(v: unknown): number | undefined {
-  if (v == null) return undefined;
+  if (v == null || typeof v === "boolean" || (typeof v !== "number" && typeof v !== "string") || (typeof v === "string" && !v.trim())) return undefined;
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return undefined;
   return n;
@@ -152,8 +153,8 @@ function deriveStatus(data: Record<string, unknown> | null): "active" | "inactiv
   if (typeof raw === "string" && raw.length > 0) {
     // Any other non-empty string — try to infer
     const lower = raw.toLowerCase();
-    if (lower.includes("aktív") || lower.includes("active")) return "active";
     if (lower.includes("neaktív") || lower.includes("zruš") || lower.includes("likvidác") || lower.includes("inactive")) return "inactive";
+    if (lower.includes("aktív") || lower.includes("active")) return "active";
   }
   return "unknown";
 }
@@ -298,7 +299,7 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
           Štatutárny orgán
         </h4>
         <ul>
-          {executives!.map((name) => (
+          {executives?.map((name) => (
             <li key={name} className="executive-item text-silver font-medium">
               {name}
             </li>
@@ -333,12 +334,12 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
 
       {!isDemo && (
         <div className="mt-8 pt-4 border-t border-border/50 flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={async () => { setCopied(await copyResponse(JSON.stringify(data, null, 2))); setTimeout(() => setCopied(false), 1500); }} className="bg-border/50 hover:bg-primary px-4 py-3 text-xs text-foreground rounded-lg transition-colors flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={async () => { setCopied(await copyResponse(JSON.stringify(data, null, 2))); setTimeout(() => setCopied(false), 1500); }} className="text-xs gap-2">
             <Copy className="w-3 h-3" />{copied ? "Skopírované" : "Kopírovať údaje"}
-          </button>
-          <button type="button" onClick={() => downloadResponse(data, `ico-${ico}.json`)} className="bg-border/50 hover:bg-primary px-4 py-3 text-xs text-foreground rounded-lg transition-colors flex items-center gap-2">
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadResponse(data, `ico-${ico}.json`)} className="text-xs gap-2">
             <Download className="w-3 h-3" />Stiahnuť JSON
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -64,6 +64,7 @@ const Diagnostic = () => {
     for (const test of TESTS) {
       const result = await searchCompany(test.ico);
       results.push({ ...test, result });
+      setEntries([...results]);
     }
     setEntries(results);
     setRunning(false);
@@ -187,9 +188,15 @@ const Diagnostic = () => {
                     Body (prvých 500 znakov)
                   </span>
                   <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
-                    {r.rawBody ? (() => { try { return JSON.stringify(JSON.parse(r.rawBody), null, 2).slice(0, 500); } catch { return r.bodyPreview; } })() : "—"}
+                     {r.bodyPreview || "—"}
                   </pre>
                 </div>
+                 <details className="border-t border-border pt-2">
+                   <summary className="cursor-pointer text-muted-foreground">Úplná odpoveď JSON</summary>
+                   <pre className="mt-2 bg-muted/30 rounded-lg p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-foreground">
+                     {r.rawBody ? (() => { try { return JSON.stringify(JSON.parse(r.rawBody), null, 2); } catch { return r.rawBody; } })() : "—"}
+                   </pre>
+                 </details>
               </CardContent>
             </Card>
           );

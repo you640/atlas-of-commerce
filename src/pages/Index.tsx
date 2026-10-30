@@ -18,7 +18,7 @@ const Index = () => {
   const handleReplay = useCallback(() => {
     const lastReq = getLastRequest();
     if (lastReq) {
-      // We'll trigger search by setting the query — for now we inform user
+      heroRef.current?.replay();
       setPanelOpen(false);
     }
   }, []);
@@ -26,7 +26,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Header onLogoLongPress={debugEnabled ? undefined : handleDebugCommand} />
-      <HeroSection onDebugCommand={handleDebugCommand} />
+      <HeroSection ref={heroRef} onDebugCommand={handleDebugCommand} />
       {debugEnabled && (
         <>
           <DebugFab onClick={() => setPanelOpen(true)} />

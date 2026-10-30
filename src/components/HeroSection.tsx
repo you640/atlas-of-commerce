@@ -1,15 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { AlertTriangle, RotateCw, SearchX } from "lucide-react";
 import SearchBox from "./SearchBox";
 import DataCardPreview from "./DataCardPreview";
 import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
 import { setLastRequest, loadFixture, getUseFixture, type DebugRequestRecord } from "@/lib/debug-store";
+import { Button } from "@/components/ui/button";
 
 interface HeroSectionProps {
   onDebugCommand?: () => void;
 }
 
-const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
+const HeroSection = forwardRef<{ replay: () => void }, HeroSectionProps>(({ onDebugCommand }, ref) => {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompanySearchResult | null>(null);
@@ -64,6 +65,7 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
       handleSubmit();
     }
   }, [query, handleSubmit]);
+  useImperativeHandle(ref, () => ({ replay }), [replay]);
 
   return (
     <main className="relative z-10 flex flex-col items-center justify-center text-center px-4 py-16 lg:py-24">
@@ -102,7 +104,7 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
         <div className="mt-8 flex items-center gap-3 text-destructive">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <span className="text-lg font-medium">{result.message}</span>
-          <button type="button" onClick={replay} className="ml-2 inline-flex items-center gap-1 text-sm text-foreground hover:text-primary"><RotateCw className="w-4 h-4" />Skúsiť znova</button>
+          <Button variant="ghost" size="sm" onClick={replay} className="ml-2 gap-1"><RotateCw className="w-4 h-4" />Skúsiť znova</Button>
         </div>
       )}
 
@@ -113,7 +115,7 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
       {!result && !loading && <DataCardPreview mode="demo" />}
     </main>
   );
-};
+});
 
 // Expose replay via ref pattern — we use a simpler callback approach from parent
 export default HeroSection;
