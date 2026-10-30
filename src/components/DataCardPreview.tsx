@@ -1,11 +1,13 @@
-import { MapPin, TrendingUp, Users, ExternalLink } from "lucide-react";
-import { type ReactNode } from "react";
+import { MapPin, TrendingUp, Users, Building2, Copy, Download } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { copyResponse, downloadResponse } from "@/lib/response-actions";
+import { Button } from "@/components/ui/button";
 
 /* ── Helpers ── */
 
 /** Clamp invalid numeric values to undefined */
 export function normalizeFinanceValue(v: unknown): number | undefined {
-  if (v == null) return undefined;
+  if (v == null || typeof v === "boolean" || (typeof v !== "number" && typeof v !== "string") || (typeof v === "string" && !v.trim())) return undefined;
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return undefined;
   return n;
@@ -60,6 +62,7 @@ export function formatAddress(address: unknown): ReactNode | undefined {
     const postal = [a.postal_code, a.zip, a.psc].find((v) => typeof v === "string" && v) as string | undefined;
     const city = [a.city, a.municipality, a.obec, a.mesto].find((v) => typeof v === "string" && v) as string | undefined;
     if (postal || city) parts.push([postal, city].filter(Boolean).join(" "));
+    if (typeof a.country === "string" && a.country && parts.length > 0) parts.push(a.country);
 
     if (parts.length === 0) return undefined;
     return (
@@ -150,8 +153,8 @@ function deriveStatus(data: Record<string, unknown> | null): "active" | "inactiv
   if (typeof raw === "string" && raw.length > 0) {
     // Any other non-empty string — try to infer
     const lower = raw.toLowerCase();
-    if (lower.includes("aktív") || lower.includes("active")) return "active";
     if (lower.includes("neaktív") || lower.includes("zruš") || lower.includes("likvidác") || lower.includes("inactive")) return "inactive";
+    if (lower.includes("aktív") || lower.includes("active")) return "active";
   }
   return "unknown";
 }
@@ -212,9 +215,11 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
     : formatAddress(extractRawField(data, "address", "sidlo", "registered_office"));
 
   // Finances
-  const revenue = isDemo ? DEMO_DATA.revenue : extractNumber(data, "revenue", "trzby", "sales", "total_revenue");
-  const profit = isDemo ? DEMO_DATA.profit : extractNumber(data, "profit", "zisk", "net_income", "net_profit");
-  const financeYear = isDemo ? "2023" : extractField(data, "finance_year", "financial_year", "rok") ?? "posledný rok";
+  const finance = isDemo ? null : extractRawField(data, "finance");
+  const financeData = finance && typeof finance === "object" && !Array.isArray(finance) ? finance as Record<string, unknown> : null;
+  const revenue = isDemo ? DEMO_DATA.revenue : extractNumber(financeData, "revenue", "trzby", "sales", "total_revenue") ?? extractNumber(data, "revenue", "trzby", "sales", "total_revenue");
+  const profit = isDemo ? DEMO_DATA.profit : extractNumber(financeData, "profit", "zisk", "net_income", "net_profit") ?? extractNumber(data, "profit", "zisk", "net_income", "net_profit");
+  const financeYear = isDemo ? "2023" : (extractField(financeData, "year", "finance_year") ?? extractField(data, "finance_year", "financial_year", "rok")) ?? "posledný rok";
   const hasFinances = revenue != null || profit != null;
 
   // Executives
@@ -224,7 +229,23 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
   const hasExecutives = executives && executives.length > 0;
 
   // Count visible grid sections to decide layout
+  const legalForm = isDemo ? undefined : extractField(data, "legal_form");
+  const foundedOn = isDemo ? undefined : extractField(data, "founded_on");
+  const dissolvedOn = isDemo ? undefined : extractField(data, "dissolved_on");
+  const [copied, setCopied] = useState(false);
   const visibleSections: ReactNode[] = [];
+  if (legalForm || foundedOn || dissolvedOn) {
+    visibleSections.push(
+      <div key="registry">
+        <h4 className="text-sm text-muted-foreground uppercase mb-4 flex items-center gap-2"><Building2 className="w-4 h-4 text-primary" />Register</h4>
+        <dl className="space-y-2 text-sm text-silver">
+          {legalForm && <div><dt className="text-muted-foreground">Právna forma</dt><dd className="font-medium">{legalForm}</dd></div>}
+          {foundedOn && <div><dt className="text-muted-foreground">Vznik</dt><dd className="font-medium">{new Date(foundedOn).toLocaleDateString("sk-SK")}</dd></div>}
+          {dissolvedOn && <div><dt className="text-muted-foreground">Zánik</dt><dd className="font-medium">{new Date(dissolvedOn).toLocaleDateString("sk-SK")}</dd></div>}
+        </dl>
+      </div>
+    );
+  }
 
   // Address section
   if (addressNode) {
@@ -278,7 +299,7 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
           Štatutárny orgán
         </h4>
         <ul>
-          {executives!.map((name) => (
+          {executives?.map((name) => (
             <li key={name} className="executive-item text-silver font-medium">
               {name}
             </li>
@@ -306,19 +327,21 @@ const DataCardPreview = (props: DataCardPreviewProps) => {
 
       {/* Data Grid */}
       {visibleSections.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-left">
           {visibleSections}
         </div>
       )}
 
-      {/* Corner Button */}
-      <a
-        href="#"
-        className="absolute bottom-0 right-0 bg-border/50 hover:bg-primary px-4 py-3 text-xs text-foreground rounded-tl-xl transition-colors flex items-center gap-2"
-      >
-        Zobraziť úplný profil & vzťahy
-        <ExternalLink className="w-3 h-3" />
-      </a>
+      {!isDemo && (
+        <div className="mt-8 pt-4 border-t border-border/50 flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={async () => { setCopied(await copyResponse(JSON.stringify(data, null, 2))); setTimeout(() => setCopied(false), 1500); }} className="text-xs gap-2">
+            <Copy className="w-3 h-3" />{copied ? "Skopírované" : "Kopírovať údaje"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadResponse(data, `ico-${ico}.json`)} className="text-xs gap-2">
+            <Download className="w-3 h-3" />Stiahnuť JSON
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

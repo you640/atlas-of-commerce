@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle, AlertTriangle, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
+import { copyResponse } from "@/lib/response-actions";
+import { searchCompany, SEARCH_HEADERS, type CompanySearchResult } from "@/lib/search-company";
 
 interface DiagnosticEntry {
   ico: string;
@@ -26,7 +27,12 @@ const TESTS: Omit<DiagnosticEntry, "result">[] = [
   },
   {
     ico: "00000000",
-    label: "Neexistujúce IČO (00000000) → očakávame not_found",
+    label: "Rezervované IČO (00000000) → nesmie vrátiť firmu",
+    expectedType: ["not_found"],
+  },
+  {
+    ico: "99999999",
+    label: "Prázdny záznam (99999999) → očakávame not_found",
     expectedType: ["not_found"],
   },
 ];
@@ -51,13 +57,14 @@ const Diagnostic = () => {
   const [entries, setEntries] = useState<DiagnosticEntry[]>([]);
   const [running, setRunning] = useState(false);
 
-  const handleRun = async () => {
+  const runDiagnostics = async () => {
     setRunning(true);
     setEntries([]);
     const results: DiagnosticEntry[] = [];
     for (const test of TESTS) {
       const result = await searchCompany(test.ico);
       results.push({ ...test, result });
+      setEntries([...results]);
     }
     setEntries(results);
     setRunning(false);
@@ -88,7 +95,7 @@ const Diagnostic = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={handleRun}
+              onClick={runDiagnostics}
               disabled={running}
             >
               {running ? (
@@ -101,7 +108,7 @@ const Diagnostic = () => {
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
             {TESTS.map((t, i) => (
-              <p key={i}>Test {i + 1}: {t.label}</p>
+              <p key={t.ico}>Test {i + 1}: {t.label}</p>
             ))}
           </CardContent>
         </Card>
@@ -140,6 +147,13 @@ const Diagnostic = () => {
                   </code>
                 </div>
 
+                <div className="flex flex-wrap gap-4">
+                  <span>Latencia: <b className="text-foreground">{r.latencyMs ?? "—"} ms</b></span>
+                  <span>Výsledok: <b className={pass ? "text-accent" : "text-destructive"}>{pass ? "PASS" : "FAIL"}</b></span>
+                </div>
+                {!pass && <p className="text-destructive">Odpoveď nezodpovedá očakávaniu tohto testu.</p>}
+                <Button variant="outline" size="sm" onClick={() => copyResponse(JSON.stringify(r, null, 2))}>Kopírovať report</Button>
+
                 {/* Status */}
                 <div>
                   <span className="text-muted-foreground block mb-1 font-medium">
@@ -155,6 +169,10 @@ const Diagnostic = () => {
                 </div>
 
                 {/* Response Headers */}
+                 <div>
+                   <span className="text-muted-foreground block mb-1 font-medium">Request Headers</span>
+                   <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">{Object.entries(SEARCH_HEADERS).map(([key, value]) => `${key}: ${value}`).join("\n")}</pre>
+                 </div>
                 <div>
                   <span className="text-muted-foreground block mb-1 font-medium">
                     Response Headers
@@ -174,9 +192,15 @@ const Diagnostic = () => {
                     Body (prvých 500 znakov)
                   </span>
                   <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
-                    {r.bodyPreview || "—"}
+                     {r.bodyPreview || "—"}
                   </pre>
                 </div>
+                 <details className="border-t border-border pt-2">
+                   <summary className="cursor-pointer text-muted-foreground">Úplná odpoveď JSON</summary>
+                   <pre className="mt-2 bg-muted/30 rounded-lg p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all text-foreground">
+                     {r.rawBody ? (() => { try { return JSON.stringify(JSON.parse(r.rawBody), null, 2); } catch { return r.rawBody; } })() : "—"}
+                   </pre>
+                 </details>
               </CardContent>
             </Card>
           );
