@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Play, Loader2, CheckCircle2, XCircle, AlertTriangle, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { copyResponse } from "@/lib/response-actions";
 import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
 
 interface DiagnosticEntry {
@@ -26,7 +27,12 @@ const TESTS: Omit<DiagnosticEntry, "result">[] = [
   },
   {
     ico: "00000000",
-    label: "Neexistujúce IČO (00000000) → očakávame not_found",
+    label: "Rezervované IČO (00000000) → nesmie vrátiť firmu",
+    expectedType: ["not_found"],
+  },
+  {
+    ico: "99999999",
+    label: "Prázdny záznam (99999999) → očakávame not_found",
     expectedType: ["not_found"],
   },
 ];
@@ -101,7 +107,7 @@ const Diagnostic = () => {
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
             {TESTS.map((t, i) => (
-              <p key={i}>Test {i + 1}: {t.label}</p>
+              <p key={t.ico}>Test {i + 1}: {t.label}</p>
             ))}
           </CardContent>
         </Card>
@@ -140,6 +146,13 @@ const Diagnostic = () => {
                   </code>
                 </div>
 
+                <div className="flex flex-wrap gap-4">
+                  <span>Latencia: <b className="text-foreground">{r.latencyMs ?? "—"} ms</b></span>
+                  <span>Výsledok: <b className={pass ? "text-accent" : "text-destructive"}>{pass ? "PASS" : "FAIL"}</b></span>
+                </div>
+                {!pass && <p className="text-destructive">Odpoveď nezodpovedá očakávaniu tohto testu.</p>}
+                <Button variant="outline" size="sm" onClick={() => copyResponse(JSON.stringify(r, null, 2))}>Kopírovať report</Button>
+
                 {/* Status */}
                 <div>
                   <span className="text-muted-foreground block mb-1 font-medium">
@@ -174,7 +187,7 @@ const Diagnostic = () => {
                     Body (prvých 500 znakov)
                   </span>
                   <pre className="bg-muted/30 rounded-lg p-2 overflow-x-auto text-foreground whitespace-pre-wrap">
-                    {r.bodyPreview || "—"}
+                    {r.rawBody ? (() => { try { return JSON.stringify(JSON.parse(r.rawBody), null, 2).slice(0, 500); } catch { return r.bodyPreview; } })() : "—"}
                   </pre>
                 </div>
               </CardContent>

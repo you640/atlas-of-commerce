@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { AlertTriangle, SearchX } from "lucide-react";
+import { AlertTriangle, RotateCw, SearchX } from "lucide-react";
 import SearchBox from "./SearchBox";
 import DataCardPreview from "./DataCardPreview";
 import { searchCompany, type CompanySearchResult } from "@/lib/search-company";
@@ -38,9 +38,8 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
     setLoading(true);
     setResult(null);
 
-    const startTime = performance.now();
     const res = await searchCompany(trimmed);
-    const latencyMs = Math.round(performance.now() - startTime);
+    const latencyMs = res.latencyMs ?? 0;
 
     setResult(res);
     setLoading(false);
@@ -53,7 +52,7 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
       httpStatus: res.status,
       latencyMs,
       timestamp: new Date().toISOString(),
-      rawJson: res.bodyPreview || JSON.stringify(res.data, null, 2) || "",
+      rawJson: res.rawBody || res.bodyPreview || JSON.stringify(res.data, null, 2) || "",
       normalizedResult: res,
     };
     setLastRequest(debugRecord);
@@ -103,6 +102,7 @@ const HeroSection = ({ onDebugCommand }: HeroSectionProps) => {
         <div className="mt-8 flex items-center gap-3 text-destructive">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <span className="text-lg font-medium">{result.message}</span>
+          <button type="button" onClick={replay} className="ml-2 inline-flex items-center gap-1 text-sm text-foreground hover:text-primary"><RotateCw className="w-4 h-4" />Skúsiť znova</button>
         </div>
       )}
 
